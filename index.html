@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tank Modern - Glassmorphism Edition</title>
+    <meta name="description" content="Một trò chơi bắn xe tăng hiện đại với phong cách Glassmorphism.">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="game-container">
+        <!-- Canvas cho Game -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Lớp phủ UI (Glassmorphism) -->
+        <div id="ui-layer">
+            <!-- Màn hình bắt đầu -->
+            <div id="start-screen" class="overlay glass active">
+                <h1>TANK MODERN</h1>
+                <p>Tiêu diệt kẻ địch và sống sót lâu nhất có thể.</p>
+                <div class="menu-stats">Kỷ lục: <span id="menu-high-score">0</span></div>
+                <div class="controls-hint">
+                    <span><strong>WASD / Mũi tên:</strong> Di chuyển</span>
+                    <span><strong>Chuột / Space:</strong> Bắn</span>
+                </div>
+                <button id="start-btn" class="btn-primary">BẮT ĐẦU</button>
+            </div>
+
+            <!-- HUD trong game -->
+            <div id="game-hud" class="glass">
+                <div class="stat">
+                    <span class="label">ĐIỂM:</span>
+                    <span id="score-val">0</span>
+                </div>
+                <div class="stat">
+                    <span class="label">MẠNG:</span>
+                    <span id="health-val">100%</span>
+                </div>
+            </div>
+
+            <!-- Màn hình Game Over -->
+            <div id="game-over-screen" class="overlay glass">
+                <h1>GAME OVER</h1>
+                <p>Điểm của bạn: <span id="final-score">0</span></p>
+                <p>Kỷ lục: <span id="high-score">0</span></p>
+                <button id="restart-btn" class="btn-primary">CHƠI LẠI</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

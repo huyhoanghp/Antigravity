@@ -1,0 +1,11 @@
+node_modules/
+.env
+.DS_Store
+*.log
+.claude/skills/agents/*/logs/
+_cached_repos/
+_skills_reference/
+temp/
+dist/
+build/
+.gemini/
