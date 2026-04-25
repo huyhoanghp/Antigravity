@@ -16,60 +16,96 @@ let shakeIntensity = 0;
 let currentLevel = 1;
 let isGameActive = false;
 
-// Audio Controller (Web Audio API)
+// Audio Controller (Web Audio API 2.0 - Sci-Fi)
 const AudioFX = {
     ctx: new (window.AudioContext || window.webkitAudioContext)(),
     
     playShoot() {
         if(this.ctx.state === 'suspended') this.ctx.resume();
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.type = 'sawtooth'; // Uy lực hơn
-        osc.frequency.setValueAtTime(250, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.15);
+        const t = this.ctx.currentTime;
+        
+        // Sóng 1: High frequency click (Plasma fizz)
+        const osc1 = this.ctx.createOscillator();
+        const gain1 = this.ctx.createGain();
+        osc1.type = 'square';
+        osc1.frequency.setValueAtTime(800, t);
+        osc1.frequency.exponentialRampToValueAtTime(100, t + 0.1);
+        gain1.gain.setValueAtTime(0.1, t);
+        gain1.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+        osc1.connect(gain1).connect(this.ctx.destination);
+        osc1.start(t);
+        osc1.stop(t + 0.1);
+
+        // Sóng 2: Thump (Lực đẩy)
+        const osc2 = this.ctx.createOscillator();
+        const gain2 = this.ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(150, t);
+        osc2.frequency.exponentialRampToValueAtTime(40, t + 0.15);
+        gain2.gain.setValueAtTime(0.2, t);
+        gain2.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+        osc2.connect(gain2).connect(this.ctx.destination);
+        osc2.start(t);
+        osc2.stop(t + 0.15);
     },
     
     playExplosion() {
         if(this.ctx.state === 'suspended') this.ctx.resume();
-        const bufSize = this.ctx.sampleRate * 0.3;
+        const t = this.ctx.currentTime;
+        const duration = 0.5;
+
+        // White Noise
+        const bufSize = this.ctx.sampleRate * duration;
         const buffer = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+        
         const noise = this.ctx.createBufferSource();
         noise.buffer = buffer;
+        
+        // Lowpass sweep
         const filter = this.ctx.createBiquadFilter();
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(800, this.ctx.currentTime);
-        filter.frequency.exponentialRampToValueAtTime(10, this.ctx.currentTime + 0.3);
+        filter.frequency.setValueAtTime(1200, t);
+        filter.frequency.exponentialRampToValueAtTime(100, t + duration);
+
         const gain = this.ctx.createGain();
-        gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.ctx.destination);
-        noise.start();
+        gain.gain.setValueAtTime(0.6, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + duration);
+
+        noise.connect(filter).connect(gain).connect(this.ctx.destination);
+        noise.start(t);
+
+        // Sub Rumble
+        const rumble = this.ctx.createOscillator();
+        const rGain = this.ctx.createGain();
+        rumble.type = 'sawtooth';
+        rumble.frequency.setValueAtTime(80, t);
+        rumble.frequency.exponentialRampToValueAtTime(20, t + duration);
+        rGain.gain.setValueAtTime(0.3, t);
+        rGain.gain.exponentialRampToValueAtTime(0.01, t + duration);
+        rumble.connect(rGain).connect(this.ctx.destination);
+        rumble.start(t);
+        rumble.stop(t + duration);
     },
     
     playPowerUp() {
         if(this.ctx.state === 'suspended') this.ctx.resume();
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(300, this.ctx.currentTime);
-        osc.frequency.setValueAtTime(600, this.ctx.currentTime + 0.1);
-        osc.frequency.setValueAtTime(900, this.ctx.currentTime + 0.2);
-        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.3);
+        const t = this.ctx.currentTime;
+        // Arpeggio: 3 nốt nhạc liên tiếp
+        const notes = [440, 554.37, 659.25, 880]; // A4, C#5, E5, A5
+        notes.forEach((freq, i) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, t + i * 0.08);
+            gain.gain.setValueAtTime(0, t + i * 0.08);
+            gain.gain.linearRampToValueAtTime(0.15, t + i * 0.08 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + i * 0.08 + 0.2);
+            osc.connect(gain).connect(this.ctx.destination);
+            osc.start(t + i * 0.08);
+            osc.stop(t + i * 0.08 + 0.2);
+        });
     }
 };
 
@@ -151,7 +187,7 @@ window.addEventListener('touchmove', (e) => {
     }
 }, {passive: false});
 
-window.addEventListener('touchend', (e) => {
+const handleJoystickEnd = (e) => {
     if (joystickTouchId === null) return;
     for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
@@ -163,7 +199,10 @@ window.addEventListener('touchend', (e) => {
             joystickStick.style.transform = 'translate(0, 0)';
         }
     }
-});
+};
+
+window.addEventListener('touchend', handleJoystickEnd);
+window.addEventListener('touchcancel', handleJoystickEnd);
 
 let isFiring = false;
 let fireTouchId = null;
@@ -180,7 +219,7 @@ fireBtn.addEventListener('touchstart', (e) => {
         }
     }
 }, {passive: false});
-window.addEventListener('touchend', (e) => {
+const handleFireEnd = (e) => {
     if (fireTouchId === null) return;
     for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
@@ -191,7 +230,10 @@ window.addEventListener('touchend', (e) => {
             fireBtn.style.background = '';
         }
     }
-});
+};
+
+window.addEventListener('touchend', handleFireEnd);
+window.addEventListener('touchcancel', handleFireEnd);
 
 window.addEventListener('mousedown', () => {
     if (gameState === STATE.PLAYING) player.shoot();
@@ -217,63 +259,100 @@ class Tank {
         ctx.translate(this.x, this.y);
         ctx.rotate(this.rotation);
 
-        // Hiệu ứng đổ bóng Neon
-        ctx.shadowBlur = 20;
+        // Hiệu ứng đổ bóng Neon tổng thể
+        ctx.shadowBlur = 15;
         ctx.shadowColor = this.color;
 
-        // Thân xe tăng (Cyberpunk / Tech style)
-        // Lớp nền đen
+        // 1. Hệ thống Xích xe (Treads) hai bên
+        ctx.fillStyle = '#0f172a'; // Đen nhám
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1;
+        // Xích trái
         ctx.beginPath();
-        ctx.roundRect(-22, -22, 44, 44, 8);
-        ctx.fillStyle = '#111827';
-        ctx.fill();
+        ctx.roundRect(-24, -28, 48, 12, 3);
+        ctx.fill(); ctx.stroke();
+        // Xích phải
+        ctx.beginPath();
+        ctx.roundRect(-24, 16, 48, 12, 3);
+        ctx.fill(); ctx.stroke();
+        
+        // Chi tiết rãnh xích (Tread lines)
+        ctx.strokeStyle = '#1e293b';
+        ctx.beginPath();
+        for (let i = -20; i <= 20; i += 6) {
+            ctx.moveTo(i, -28); ctx.lineTo(i, -16);
+            ctx.moveTo(i, 16); ctx.lineTo(i, 28);
+        }
+        ctx.stroke();
 
-        // Lớp gradient màu của Tank
+        // 2. Thân chính (Main Hull)
         ctx.beginPath();
         ctx.roundRect(-20, -20, 40, 40, 6);
-        const grad = ctx.createLinearGradient(-20, -20, 20, 20);
-        grad.addColorStop(0, this.color);
-        grad.addColorStop(1, '#000000');
-        ctx.fillStyle = grad;
+        const hullGrad = ctx.createLinearGradient(-20, -20, 20, 20);
+        hullGrad.addColorStop(0, '#1e293b');
+        hullGrad.addColorStop(1, '#0f172a');
+        ctx.fillStyle = hullGrad;
         ctx.fill();
         ctx.strokeStyle = this.color;
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Các chi tiết máy móc (Lines)
+        // 3. Mảng Giáp xếp lớp (Armor Plates)
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
         ctx.beginPath();
-        ctx.moveTo(-10, -10); ctx.lineTo(10, -10);
-        ctx.moveTo(-10, 10); ctx.lineTo(10, 10);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.moveTo(-15, -15); ctx.lineTo(15, -15);
+        ctx.lineTo(20, 0); ctx.lineTo(15, 15);
+        ctx.lineTo(-15, 15); ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // Nòng súng (Tương lai)
-        ctx.shadowBlur = 0; // Tắt glow cho nòng súng để nhìn cứng cáp hơn
+        // Cổng xả khí (Exhaust Vents) phía sau
+        ctx.fillStyle = '#ef4444'; // Sáng đỏ
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = '#ef4444';
+        ctx.fillRect(-18, -10, 4, 6);
+        ctx.fillRect(-18, 4, 4, 6);
+        ctx.shadowBlur = 0;
+
+        // 4. Nòng súng (Cannon Barrel)
         ctx.beginPath();
-        ctx.roundRect(10, -5, 28, 10, 3);
-        const gunGrad = ctx.createLinearGradient(10, -5, 38, 5);
-        gunGrad.addColorStop(0, '#374151');
-        gunGrad.addColorStop(1, '#9ca3af');
+        ctx.roundRect(10, -4, 30, 8, 2);
+        const gunGrad = ctx.createLinearGradient(10, -4, 40, 4);
+        gunGrad.addColorStop(0, '#334155');
+        gunGrad.addColorStop(1, '#64748b');
         ctx.fillStyle = gunGrad;
         ctx.fill();
-        ctx.strokeStyle = '#111827';
+        ctx.strokeStyle = '#0f172a';
         ctx.stroke();
         
-        // Nòng súng phát sáng ở mũi
+        // Lỗ tản nhiệt trên nòng
+        ctx.fillStyle = '#0f172a';
+        for (let i = 15; i <= 25; i += 5) {
+            ctx.fillRect(i, -2, 2, 4);
+        }
+
+        // Mũi nòng phát sáng
         ctx.beginPath();
-        ctx.arc(36, 0, 4, 0, Math.PI * 2);
+        ctx.arc(38, 0, 5, 0, Math.PI * 2);
         ctx.fillStyle = this.color;
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 15;
         ctx.shadowColor = this.color;
         ctx.fill();
 
-        // Tháp pháo (Turret Dome)
+        // 5. Tháp pháo đa giác (Hexagon Turret Dome)
         ctx.beginPath();
-        ctx.arc(0, 0, 14, 0, Math.PI * 2);
-        const turretGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 14);
-        turretGrad.addColorStop(0, '#4b5563');
-        turretGrad.addColorStop(1, '#111827');
+        ctx.moveTo(8, 0);
+        ctx.lineTo(4, 10);
+        ctx.lineTo(-6, 10);
+        ctx.lineTo(-10, 0);
+        ctx.lineTo(-6, -10);
+        ctx.lineTo(4, -10);
+        ctx.closePath();
+        const turretGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 15);
+        turretGrad.addColorStop(0, '#475569');
+        turretGrad.addColorStop(1, '#0f172a');
         ctx.fillStyle = turretGrad;
         ctx.fill();
         ctx.strokeStyle = this.color;
@@ -728,7 +807,10 @@ function createExplosion(x, y, color) {
 function nextLevel() {
     currentLevel++;
     floatingTexts.push(new FloatingText(canvas.width/2, canvas.height/2, `LEVEL ${currentLevel}`, '#3b82f6'));
-    setTimeout(() => initGame(), 2000);
+    setTimeout(() => {
+        initGame();
+        spawnEnemy(); // Sửa lỗi: Gọi sinh lính khi bắt đầu level mới
+    }, 2000);
 }
 
 function updateUI() {
