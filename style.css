@@ -198,9 +198,12 @@ p {
 
 #joystick-zone, #fire-zone {
     pointer-events: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-#joystick-base {
+#joystick-base, #fire-joystick-base {
     width: 140px;
     height: 140px;
     background: rgba(15, 23, 42, 0.6);
@@ -214,37 +217,100 @@ p {
     box-shadow: 0 0 20px rgba(59, 130, 246, 0.2), inset 0 0 10px rgba(59, 130, 246, 0.2);
 }
 
-#joystick-stick {
-    width: 60px;
-    height: 60px;
-    background: radial-gradient(circle, #60a5fa 0%, #3b82f6 100%);
-    border-radius: 50%;
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), inset 0 0 15px rgba(255, 255, 255, 0.5);
-    cursor: pointer;
-    border: 2px solid #93c5fd;
-}
-
-#fire-btn {
-    width: 100px;
-    height: 100px;
-    background: rgba(15, 23, 42, 0.6);
-    backdrop-filter: blur(8px);
-    border: 2px solid rgba(239, 68, 68, 0.5);
-    border-radius: 50%;
-    font-size: 3rem;
-    color: white;
-    cursor: pointer;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    transition: transform 0.1s, background 0.1s;
+#fire-joystick-base {
+    border-color: rgba(239, 68, 68, 0.5);
     box-shadow: 0 0 20px rgba(239, 68, 68, 0.2), inset 0 0 10px rgba(239, 68, 68, 0.2);
 }
 
-#fire-btn:active {
-    transform: scale(0.9);
-    background: rgba(239, 68, 68, 0.6);
-    box-shadow: 0 0 30px rgba(239, 68, 68, 0.8);
+#joystick-stick, #fire-joystick-stick {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    position: absolute;
+    cursor: pointer;
+    transform: translate(0px, 0px);
+}
+
+#joystick-stick {
+    background: radial-gradient(circle, #60a5fa 0%, #3b82f6 100%);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), inset 0 0 15px rgba(255, 255, 255, 0.5);
+    border: 2px solid #93c5fd;
+}
+
+#fire-joystick-stick {
+    background: radial-gradient(circle, #f87171 0%, #ef4444 100%);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.8), inset 0 0 15px rgba(255, 255, 255, 0.5);
+    border: 2px solid #fca5a5;
+}
+
+/* Talent Tree Styling */
+.wide-panel {
+    width: 80%;
+    max-width: 800px;
+    padding: 40px;
+}
+
+.currency-display {
+    display: flex;
+    justify-content: space-around;
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #94a3b8;
+}
+
+.currency-display span {
+    color: #fcd34d;
+}
+
+.upgrades-grid {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.upgrade-card {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 10px;
+    padding: 20px;
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.upgrade-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+.upgrade-card h3 {
+    margin-top: 0;
+    color: #f8fafc;
+    font-size: 1.1rem;
+}
+
+.upgrade-card p {
+    font-size: 0.9rem;
+    color: #cbd5e1;
+    margin: 10px 0;
+}
+
+.upgrade-card .cost {
+    color: #fcd34d;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.small-btn {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    margin-top: auto;
 }
 
 /* Hiện trên thiết bị cảm ứng */

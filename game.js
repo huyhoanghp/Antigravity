@@ -10,6 +10,7 @@ const STATE = {
 
 let gameState = STATE.MENU;
 let score = 0;
+let skillPoints = 0;
 let highScore = localStorage.getItem('tankHighScore') || 0;
 let animationId;
 let shakeIntensity = 0;
@@ -128,7 +129,7 @@ window.addEventListener('mousemove', e => {
     mousePos.y = e.clientY;
 });
 
-// Joystick State
+// Movement Joystick State
 let joystickData = {
     active: false,
     x: 0,
@@ -141,8 +142,21 @@ const joystickStick = document.getElementById('joystick-stick');
 const joystickBase = document.getElementById('joystick-base');
 let joystickTouchId = null;
 
-function updateJoystick(touch) {
-    const rect = joystickBase.getBoundingClientRect();
+// Fire Joystick State
+let fireJoystickData = {
+    active: false,
+    x: 0,
+    y: 0,
+    angle: 0,
+    distance: 0
+};
+
+const fireJoystickStick = document.getElementById('fire-joystick-stick');
+const fireJoystickBase = document.getElementById('fire-joystick-base');
+let fireJoystickTouchId = null;
+
+function updateJoystick(touch, base, stick, data) {
+    const rect = base.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     
@@ -157,38 +171,57 @@ function updateJoystick(touch) {
         dy *= maxDist / dist;
     }
     
-    joystickData.active = true;
-    joystickData.x = dx / maxDist;
-    joystickData.y = dy / maxDist;
-    joystickData.angle = Math.atan2(dy, dx);
+    data.active = true;
+    data.x = dx / maxDist;
+    data.y = dy / maxDist;
+    data.angle = Math.atan2(dy, dx);
     
-    joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
+    stick.style.transform = `translate(${dx}px, ${dy}px)`;
 }
 
+// Touch Handling for Movement Joystick
 joystickBase.addEventListener('touchstart', (e) => {
     e.preventDefault();
+    e.stopPropagation();
     for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         if (joystickTouchId === null) {
             joystickTouchId = touch.identifier;
-            updateJoystick(touch);
+            updateJoystick(touch, joystickBase, joystickStick, joystickData);
+        }
+    }
+}, {passive: false});
+
+// Touch Handling for Fire Joystick
+fireJoystickBase.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+        if (fireJoystickTouchId === null) {
+            fireJoystickTouchId = touch.identifier;
+            updateJoystick(touch, fireJoystickBase, fireJoystickStick, fireJoystickData);
         }
     }
 }, {passive: false});
 
 window.addEventListener('touchmove', (e) => {
-    if (joystickTouchId === null) return;
     for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         if (touch.identifier === joystickTouchId) {
             e.preventDefault();
-            updateJoystick(touch);
+            updateJoystick(touch, joystickBase, joystickStick, joystickData);
+        } else if (touch.identifier === fireJoystickTouchId) {
+            e.preventDefault();
+            updateJoystick(touch, fireJoystickBase, fireJoystickStick, fireJoystickData);
+        } else if (touch.identifier === screenTouchId) {
+            screenTouchPos.x = touch.clientX;
+            screenTouchPos.y = touch.clientY;
         }
     }
 }, {passive: false});
 
-const handleJoystickEnd = (e) => {
-    if (joystickTouchId === null) return;
+const handleTouchEnd = (e) => {
     for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
         if (touch.identifier === joystickTouchId) {
@@ -197,47 +230,52 @@ const handleJoystickEnd = (e) => {
             joystickData.x = 0;
             joystickData.y = 0;
             joystickStick.style.transform = 'translate(0, 0)';
+        } else if (touch.identifier === fireJoystickTouchId) {
+            fireJoystickTouchId = null;
+            fireJoystickData.active = false;
+            fireJoystickData.x = 0;
+            fireJoystickData.y = 0;
+            fireJoystickStick.style.transform = 'translate(0, 0)';
+        } else if (touch.identifier === screenTouchId) {
+            screenTouchId = null;
+            isScreenFiring = false;
         }
     }
 };
 
-window.addEventListener('touchend', handleJoystickEnd);
-window.addEventListener('touchcancel', handleJoystickEnd);
+window.addEventListener('touchend', handleTouchEnd);
+window.addEventListener('touchcancel', handleTouchEnd);
 
-let isFiring = false;
-let fireTouchId = null;
-const fireBtn = document.getElementById('fire-btn');
-fireBtn.addEventListener('touchstart', (e) => {
-    e.preventDefault();
+// Touch Anywhere to Shoot (Screen Touch)
+let isScreenFiring = false;
+let screenTouchId = null;
+let screenTouchPos = { x: 0, y: 0 };
+
+window.addEventListener('touchstart', (e) => {
+    if (gameState !== STATE.PLAYING) return;
     for (let i = 0; i < e.changedTouches.length; i++) {
         const touch = e.changedTouches[i];
-        if (fireTouchId === null) {
-            fireTouchId = touch.identifier;
-            isFiring = true;
-            fireBtn.style.transform = 'scale(0.9)';
-            fireBtn.style.background = 'rgba(239, 68, 68, 0.6)';
+        // Ignore if touch is on joysticks
+        if (touch.target.closest('#joystick-zone') || touch.target.closest('#fire-zone')) continue;
+        
+        if (screenTouchId === null) {
+            screenTouchId = touch.identifier;
+            screenTouchPos.x = touch.clientX;
+            screenTouchPos.y = touch.clientY;
+            isScreenFiring = true;
         }
     }
 }, {passive: false});
-const handleFireEnd = (e) => {
-    if (fireTouchId === null) return;
-    for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        if (touch.identifier === fireTouchId) {
-            fireTouchId = null;
-            isFiring = false;
-            fireBtn.style.transform = '';
-            fireBtn.style.background = '';
-        }
-    }
-};
 
-window.addEventListener('touchend', handleFireEnd);
-window.addEventListener('touchcancel', handleFireEnd);
-
-window.addEventListener('mousedown', () => {
-    if (gameState === STATE.PLAYING) player.shoot();
+// Mouse firing
+let isMouseFiring = false;
+window.addEventListener('mousedown', (e) => {
+    if (gameState === STATE.PLAYING) isMouseFiring = true;
 });
+window.addEventListener('mouseup', () => {
+    isMouseFiring = false;
+});
+
 
 // Lớp Xe Tăng Cơ Bản
 class Tank {
@@ -245,7 +283,8 @@ class Tank {
         this.x = x;
         this.y = y;
         this.color = color; // Base color
-        this.rotation = 0;
+        this.hullRotation = 0;
+        this.turretRotation = 0;
         this.speed = 3;
         this.radius = 25;
         this.health = 100;
@@ -257,7 +296,7 @@ class Tank {
     draw() {
         ctx.save();
         ctx.translate(this.x, this.y);
-        ctx.rotate(this.rotation);
+        ctx.rotate(this.hullRotation);
 
         // Hiệu ứng đổ bóng Neon tổng thể
         ctx.shadowBlur = 15;
@@ -315,6 +354,16 @@ class Tank {
         ctx.fillRect(-18, -10, 4, 6);
         ctx.fillRect(-18, 4, 4, 6);
         ctx.shadowBlur = 0;
+        
+        ctx.restore(); // Kết thúc vẽ Thân xe
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.turretRotation);
+        
+        // Hiệu ứng đổ bóng Neon cho tháp pháo
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = this.color;
 
         // 4. Nòng súng (Cannon Barrel)
         ctx.beginPath();
@@ -441,28 +490,53 @@ class Player extends Tank {
     }
 
     update() {
-        // Di chuyển bằng phím
-        const currentSpeed = this.speed * this.speedMultiplier;
-        if (keys['KeyW'] || keys['ArrowUp']) this.y -= currentSpeed;
-        if (keys['KeyS'] || keys['ArrowDown']) this.y += currentSpeed;
-        if (keys['KeyA'] || keys['ArrowLeft']) this.x -= currentSpeed;
-        if (keys['KeyD'] || keys['ArrowRight']) this.x += currentSpeed;
-
-        // Di chuyển bằng Joystick
+        // Xử lý di chuyển và Hướng Thân Xe
+        let dx = 0; let dy = 0;
+        
         if (joystickData.active) {
-            this.x += joystickData.x * currentSpeed;
-            this.y += joystickData.y * currentSpeed;
-            this.rotation = joystickData.angle;
+            dx = joystickData.x;
+            dy = joystickData.y;
+            this.hullRotation = joystickData.angle;
         } else {
-            // Xoay theo chuột nếu không dùng joystick
-            this.rotation = Math.atan2(mousePos.y - this.y, mousePos.x - this.x);
+            if (keys['KeyW'] || keys['ArrowUp']) dy -= 1;
+            if (keys['KeyS'] || keys['ArrowDown']) dy += 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) dx -= 1;
+            if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
+            
+            if (dx !== 0 || dy !== 0) {
+                const len = Math.hypot(dx, dy);
+                dx /= len;
+                dy /= len;
+                this.hullRotation = Math.atan2(dy, dx);
+            }
         }
-
-        // Giới hạn biên
+        
+        this.x += dx * this.speed * this.speedMultiplier;
+        this.y += dy * this.speed * this.speedMultiplier;
+        
         this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
         this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
 
-        if (keys['Space'] || isFiring) this.shoot();
+        // Xử lý Hướng Ngắm Bắn và Tháp Pháo
+        let shouldShoot = false;
+        
+        if (fireJoystickData.active) {
+            this.turretRotation = fireJoystickData.angle;
+            shouldShoot = true;
+        } else if (isScreenFiring) {
+            this.turretRotation = Math.atan2(screenTouchPos.y - this.y, screenTouchPos.x - this.x);
+            shouldShoot = true;
+        } else if (isMouseFiring || keys['Space']) {
+            this.turretRotation = Math.atan2(mousePos.y - this.y, mousePos.x - this.x);
+            shouldShoot = true;
+        } else {
+            // Không bắn, tháp pháo hướng theo chuột
+            this.turretRotation = Math.atan2(mousePos.y - this.y, mousePos.x - this.x);
+        }
+
+        if (shouldShoot) {
+            this.shoot();
+        }
     }
 
     shoot() {
@@ -473,7 +547,7 @@ class Player extends Tank {
             if (this.bulletType === 'TRIPLE' || this.multiShotCount > 1) {
                 // Bắn nhiều tia dựa trên multiShotCount
                 const spread = 0.2;
-                const startAngle = this.rotation - (spread * (this.multiShotCount - 1)) / 2;
+                const startAngle = this.turretRotation - (spread * (this.multiShotCount - 1)) / 2;
                 for (let i = 0; i < this.multiShotCount; i++) {
                     const angle = startAngle + i * spread;
                     const b = new Bullet(this.x, this.y, angle, true);
@@ -481,24 +555,58 @@ class Player extends Tank {
                     bullets.push(b);
                 }
             } else {
-                const b = new Bullet(this.x, this.y, this.rotation, true);
+                const b = new Bullet(this.x, this.y, this.turretRotation, true);
                 b.speed = bulletSpeed;
                 bullets.push(b);
             }
+            
+            // Giật lùi (theo chiều ngược lại hướng tháp pháo)
+            this.x -= Math.cos(this.turretRotation) * 2;
+            this.y -= Math.sin(this.turretRotation) * 2;
+            
             this.lastShot = now;
         }
     }
 }
 
 class Enemy extends Tank {
-    constructor(x, y, isBoss = false) {
-        super(x, y, isBoss ? '#f59e0b' : '#ef4444');
-        this.isBoss = isBoss;
-        this.radius = isBoss ? 60 : 25;
-        this.health = isBoss ? 500 + currentLevel * 200 : 100;
-        this.speed = isBoss ? 1 : 1.5 + Math.random() + (currentLevel * 0.1);
-        this.shotDelay = isBoss ? 800 : 1000 + Math.random() * 2000;
-        this.scoreValue = isBoss ? 500 : 10;
+    constructor(x, y, type = 'BASIC') {
+        let color = '#ef4444';
+        if (type === 'BOSS') color = '#f59e0b';
+        else if (type === 'SCOUT') color = '#c084fc';
+        else if (type === 'ARTILLERY') color = '#eab308';
+        
+        super(x, y, color);
+        this.type = type;
+        this.isBoss = type === 'BOSS';
+        
+        if (this.isBoss) {
+            this.radius = 60;
+            this.health = 500 + currentLevel * 200;
+            this.speed = 0.5;
+            this.shotDelay = 800;
+            this.scoreValue = 500;
+        } else if (type === 'SCOUT') {
+            this.radius = 20;
+            this.health = 50;
+            this.speed = (2.5 + Math.random() + (currentLevel * 0.1)) * 0.5; // Giảm 50% nhưng vẫn nhanh hơn Basic
+            this.shotDelay = 1500;
+            this.scoreValue = 15;
+        } else if (type === 'ARTILLERY') {
+            this.radius = 35;
+            this.health = 200;
+            this.speed = (0.8 + Math.random() * 0.5) * 0.5; // Giảm 50%, rất chậm
+            this.shotDelay = 2500;
+            this.scoreValue = 25;
+        } else {
+            // BASIC
+            this.radius = 25;
+            this.health = 100;
+            this.speed = (1.5 + Math.random() + (currentLevel * 0.1)) * 0.5; // Giảm 50% tốc độ
+            this.shotDelay = 1000 + Math.random() * 2000;
+            this.scoreValue = 10;
+        }
+        this.maxHealth = this.health;
     }
 
     draw() {
@@ -515,7 +623,7 @@ class Enemy extends Tank {
             ctx.restore();
 
             // Thanh máu Boss cao cấp
-            const healthPercent = this.health / (500 + currentLevel * 200);
+            const healthPercent = this.health / this.maxHealth;
             ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
             ctx.fillRect(this.x - 50, this.y - 80, 100, 10);
             ctx.fillStyle = '#ef4444';
@@ -524,22 +632,40 @@ class Enemy extends Tank {
     }
 
     update() {
-        // Di chuyển về phía người chơi
         const dx = player.x - this.x;
         const dy = player.y - this.y;
         const angle = Math.atan2(dy, dx);
-        this.rotation = angle;
+        
+        this.turretRotation = angle;
+        this.hullRotation = angle;
 
         const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > 150) {
+        
+        let stopDist = 150;
+        if (this.type === 'SCOUT') stopDist = 50; // Áp sát
+        if (this.type === 'ARTILLERY') stopDist = 300; // Đứng xa
+
+        if (dist > stopDist) {
             this.x += Math.cos(angle) * this.speed;
             this.y += Math.sin(angle) * this.speed;
         }
 
-        // Tự động bắn
+        // Bắn
         const now = Date.now();
         if (now - this.lastShot > this.shotDelay) {
-            bullets.push(new Bullet(this.x, this.y, this.rotation, false));
+            if (this.type === 'ARTILLERY') {
+                // Bắn 3 tia
+                for (let i = -1; i <= 1; i++) {
+                    bullets.push(new Bullet(this.x, this.y, this.turretRotation + i * 0.15, false));
+                }
+            } else if (this.isBoss) {
+                // Boss bắn chùm 5 tia
+                for (let i = -2; i <= 2; i++) {
+                    bullets.push(new Bullet(this.x, this.y, this.turretRotation + i * 0.1, false));
+                }
+            } else {
+                bullets.push(new Bullet(this.x, this.y, this.turretRotation, false));
+            }
             this.lastShot = now;
         }
     }
@@ -783,13 +909,26 @@ function spawnEnemy(isBoss = false) {
         y = Math.random() < 0.5 ? -100 : canvas.height + 100;
     }
     
-    // Enemy Spawn Indicator (UX Cyberpunk)
+    let type = 'BASIC';
+    if (isBoss) type = 'BOSS';
+    else {
+        const rand = Math.random();
+        if (rand < 0.2) type = 'SCOUT';
+        else if (rand < 0.35) type = 'ARTILLERY';
+    }
+
+    // Enemy Spawn Indicator
+    let indicatorColor = '#ef4444';
+    if (type === 'BOSS') indicatorColor = '#f59e0b';
+    else if (type === 'SCOUT') indicatorColor = '#c084fc';
+    else if (type === 'ARTILLERY') indicatorColor = '#eab308';
+
     floatingTexts.push(new FloatingText(x > canvas.width ? canvas.width - 50 : (x < 0 ? 50 : x), 
                                       y > canvas.height ? canvas.height - 50 : (y < 0 ? 50 : y), 
-                                      '', isBoss ? '#f59e0b' : '#ef4444', true));
+                                      '', indicatorColor, true));
 
     setTimeout(() => {
-        enemies.push(new Enemy(x, y, isBoss));
+        enemies.push(new Enemy(x, y, type));
         if (!isBoss) levelEnemiesLeft--;
         if (levelEnemiesLeft > 0) setTimeout(spawnEnemy, 2000 - currentLevel * 100);
     }, 1500);
@@ -804,22 +943,68 @@ function createExplosion(x, y, color) {
     shakeIntensity = 20;
 }
 
-function nextLevel() {
+function showTalentTree() {
+    gameState = STATE.MENU; // Tạm dừng game
+    document.getElementById('shop-score').innerText = score;
+    document.getElementById('shop-sp').innerText = skillPoints;
+    document.getElementById('talent-tree-screen').classList.add('active');
+}
+
+document.getElementById('continue-btn').addEventListener('click', () => {
+    document.getElementById('talent-tree-screen').classList.remove('active');
+    gameState = STATE.PLAYING;
     currentLevel++;
     floatingTexts.push(new FloatingText(canvas.width/2, canvas.height/2, `LEVEL ${currentLevel}`, '#3b82f6'));
     setTimeout(() => {
         initGame();
-        spawnEnemy(); // Sửa lỗi: Gọi sinh lính khi bắt đầu level mới
+        spawnEnemy();
     }, 2000);
+});
+
+// Logic mua nâng cấp
+document.getElementById('btn-upg-health').addEventListener('click', () => buyUpgrade('health'));
+document.getElementById('btn-upg-speed').addEventListener('click', () => buyUpgrade('speed'));
+document.getElementById('btn-upg-firerate').addEventListener('click', () => buyUpgrade('firerate'));
+
+function buyUpgrade(type) {
+    let costScore = 0;
+    let costSP = 0;
+
+    if (type === 'health') { costScore = 1000; costSP = 1; }
+    if (type === 'speed') { costScore = 800; costSP = 0; }
+    if (type === 'firerate') { costScore = 1500; costSP = 2; }
+
+    if (score >= costScore && skillPoints >= costSP) {
+        score -= costScore;
+        skillPoints -= costSP;
+        
+        if (type === 'health') player.health = Math.min(100, player.health + 20);
+        if (type === 'speed') player.speedMultiplier += 0.1;
+        if (type === 'firerate') player.shotDelay = Math.max(100, player.shotDelay * 0.9);
+        
+        document.getElementById('shop-score').innerText = score;
+        document.getElementById('shop-sp').innerText = skillPoints;
+        updateUI();
+        AudioFX.playPowerUp();
+        
+        floatingTexts.push(new FloatingText(canvas.width/2, canvas.height/2 + 50, "UPGRADED!", '#10b981'));
+    } else {
+        floatingTexts.push(new FloatingText(canvas.width/2, canvas.height/2 + 50, "NOT ENOUGH POINTS!", '#ef4444'));
+    }
+}
+
+function nextLevel() {
+    // Gọi Talent Tree thay vì nhảy thẳng màn
+    showTalentTree();
 }
 
 function updateUI() {
     document.getElementById('score-val').innerText = score;
+    document.getElementById('sp-val').innerText = skillPoints;
     document.getElementById('health-val').innerText = player.health + '%';
     document.getElementById('final-score').innerText = score;
     document.getElementById('high-score').innerText = highScore;
     document.getElementById('menu-high-score').innerText = highScore;
-    // Có thể thêm hiển thị Level lên HUD nếu muốn
 }
 
 function checkCollisions() {
@@ -843,6 +1028,8 @@ function checkCollisions() {
                         floatingTexts.push(new FloatingText(e.x, e.y, `+${e.scoreValue}`, '#fcd34d'));
                         
                         if (e.isBoss) {
+                            skillPoints += 3;
+                            floatingTexts.push(new FloatingText(e.x, e.y - 20, '+3 SP', '#c084fc'));
                             nextLevel();
                         } else {
                             enemiesDefeated++;

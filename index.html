@@ -2,33 +2,32 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tank Modern - Glassmorphism Edition</title>
-    <meta name="description" content="Một trò chơi bắn xe tăng hiện đại với phong cách Glassmorphism.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tank Modern - Cyberpunk Edition</title>
+    <meta name="description" content="Một trò chơi bắn xe tăng hiện đại với phong cách Cyberpunk.">
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="game-container">
         <!-- Canvas cho Game -->
         <canvas id="gameCanvas"></canvas>
 
-        <!-- Lớp phủ UI (Glassmorphism) -->
+        <!-- Lớp phủ UI (Glassmorphism / Cyberpunk) -->
         <div id="ui-layer">
             <!-- Màn hình bắt đầu -->
-            <div id="start-screen" class="overlay glass active">
+            <div id="start-screen" class="overlay active">
                 <h1>TANK MODERN</h1>
                 <p>Tiêu diệt kẻ địch và sống sót lâu nhất có thể.</p>
                 <div class="menu-stats">Kỷ lục: <span id="menu-high-score">0</span></div>
                 <div class="controls-hint">
-                    <span><strong>WASD / Mũi tên:</strong> Di chuyển</span>
-                    <span><strong>Chuột / Space:</strong> Bắn</span>
+                    <span><strong>WASD / Mũi tên / Chuột:</strong> Điều khiển</span>
                 </div>
-                <button id="start-btn" class="btn-primary">BẮT ĐẦU</button>
+                <button id="start-btn" class="btn">BẮT ĐẦU</button>
             </div>
 
             <!-- HUD trong game -->
-            <div id="game-hud" class="glass">
+            <div id="game-hud">
                 <div class="stat">
                     <span class="label">ĐIỂM:</span>
                     <span id="score-val">0</span>
@@ -37,14 +36,54 @@
                     <span class="label">MẠNG:</span>
                     <span id="health-val">100%</span>
                 </div>
+                <div class="stat">
+                    <span class="label" style="color: #c084fc;">KỸ NĂNG:</span>
+                    <span id="sp-val" style="color: #c084fc;">0</span>
+                </div>
             </div>
 
             <!-- Màn hình Game Over -->
-            <div id="game-over-screen" class="overlay glass">
-                <h1>GAME OVER</h1>
-                <p>Điểm của bạn: <span id="final-score">0</span></p>
-                <p>Kỷ lục: <span id="high-score">0</span></p>
-                <button id="restart-btn" class="btn-primary">CHƠI LẠI</button>
+            <div id="game-over-screen" class="overlay">
+                <div class="panel">
+                    <h1>GAME OVER</h1>
+                    <p>Điểm: <span id="final-score">0</span></p>
+                    <p>Kỷ lục: <span id="high-score">0</span></p>
+                    <button id="restart-btn" class="btn">CHƠI LẠI</button>
+                </div>
+            </div>
+
+            <!-- Màn hình Cây kỹ năng (Talent Tree) -->
+            <div id="talent-tree-screen" class="overlay">
+                <div class="panel wide-panel">
+                    <h1 style="color: #c084fc;">CÂY KỸ NĂNG</h1>
+                    <div class="currency-display">
+                        <p>Điểm: <span id="shop-score">0</span></p>
+                        <p>Điểm Kỹ năng (SP): <span id="shop-sp">0</span></p>
+                    </div>
+                    
+                    <div class="upgrades-grid">
+                        <div class="upgrade-card" id="upg-health">
+                            <h3>Giáp Titan</h3>
+                            <p>+20 Máu Tối đa</p>
+                            <p class="cost">Giá: 1000 Điểm + 1 SP</p>
+                            <button class="btn small-btn" id="btn-upg-health">MUA</button>
+                        </div>
+                        <div class="upgrade-card" id="upg-speed">
+                            <h3>Động cơ Ion</h3>
+                            <p>+10% Tốc độ</p>
+                            <p class="cost">Giá: 800 Điểm + 0 SP</p>
+                            <button class="btn small-btn" id="btn-upg-speed">MUA</button>
+                        </div>
+                        <div class="upgrade-card" id="upg-firerate">
+                            <h3>Tản nhiệt Nòng</h3>
+                            <p>-10% Thời gian nạp đạn</p>
+                            <p class="cost">Giá: 1500 Điểm + 2 SP</p>
+                            <button class="btn small-btn" id="btn-upg-firerate">MUA</button>
+                        </div>
+                    </div>
+                    
+                    <button id="continue-btn" class="btn" style="margin-top: 20px;">TIẾP TỤC CHIẾN ĐẤU</button>
+                </div>
             </div>
 
             <!-- Điều khiển Mobile (Chỉ hiện trên mobile/tablet) -->
@@ -55,7 +94,9 @@
                     </div>
                 </div>
                 <div id="fire-zone">
-                    <button id="fire-btn">🔥</button>
+                    <div id="fire-joystick-base">
+                        <div id="fire-joystick-stick"></div>
+                    </div>
                 </div>
             </div>
         </div>
