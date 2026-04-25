@@ -80,6 +80,7 @@ canvas {
     display: flex;
     opacity: 1;
     transform: scale(1);
+    pointer-events: auto;
 }
 
 h1 {

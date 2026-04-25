@@ -180,30 +180,34 @@ function updateJoystick(touch, base, stick, data) {
 }
 
 // Touch Handling for Movement Joystick
-joystickBase.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        if (joystickTouchId === null) {
-            joystickTouchId = touch.identifier;
-            updateJoystick(touch, joystickBase, joystickStick, joystickData);
+if (joystickBase) {
+    joystickBase.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (joystickTouchId === null) {
+                joystickTouchId = touch.identifier;
+                updateJoystick(touch, joystickBase, joystickStick, joystickData);
+            }
         }
-    }
-}, {passive: false});
+    }, {passive: false});
+}
 
 // Touch Handling for Fire Joystick
-fireJoystickBase.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        if (fireJoystickTouchId === null) {
-            fireJoystickTouchId = touch.identifier;
-            updateJoystick(touch, fireJoystickBase, fireJoystickStick, fireJoystickData);
+if (fireJoystickBase) {
+    fireJoystickBase.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (fireJoystickTouchId === null) {
+                fireJoystickTouchId = touch.identifier;
+                updateJoystick(touch, fireJoystickBase, fireJoystickStick, fireJoystickData);
+            }
         }
-    }
-}, {passive: false});
+    }, {passive: false});
+}
 
 window.addEventListener('touchmove', (e) => {
     for (let i = 0; i < e.changedTouches.length; i++) {
