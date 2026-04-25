@@ -13,6 +13,61 @@ let score = 0;
 let highScore = localStorage.getItem('tankHighScore') || 0;
 let animationId;
 let shakeIntensity = 0;
+let currentLevel = 1;
+let isGameActive = false;
+
+// Audio Controller (Web Audio API)
+const AudioFX = {
+    ctx: new (window.AudioContext || window.webkitAudioContext)(),
+    
+    playShoot() {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.1);
+    },
+    
+    playExplosion() {
+        const bufSize = this.ctx.sampleRate * 0.2;
+        const buffer = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1000, this.ctx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start();
+    },
+    
+    playPowerUp() {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.2);
+    }
+};
 
 // Cấu hình Canvas
 function resizeCanvas() {
@@ -27,11 +82,73 @@ const keys = {};
 window.addEventListener('keydown', e => keys[e.code] = true);
 window.addEventListener('keyup', e => keys[e.code] = false);
 
-let mousePos = { x: 0, y: 0 };
 window.addEventListener('mousemove', e => {
     mousePos.x = e.clientX;
     mousePos.y = e.clientY;
 });
+
+// Joystick State
+let joystickData = {
+    active: false,
+    x: 0,
+    y: 0,
+    angle: 0,
+    distance: 0
+};
+
+const joystickStick = document.getElementById('joystick-stick');
+const joystickBase = document.getElementById('joystick-base');
+
+function handleJoystick(e) {
+    const touch = e.touches[0];
+    const rect = joystickBase.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    let dx = touch.clientX - centerX;
+    let dy = touch.clientY - centerY;
+    
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const maxDist = rect.width / 2;
+    
+    if (dist > maxDist) {
+        dx *= maxDist / dist;
+        dy *= maxDist / dist;
+    }
+    
+    joystickData.active = true;
+    joystickData.x = dx / maxDist;
+    joystickData.y = dy / maxDist;
+    joystickData.angle = Math.atan2(dy, dx);
+    
+    joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
+}
+
+joystickBase.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    handleJoystick(e);
+});
+
+joystickBase.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    handleJoystick(e);
+});
+
+joystickBase.addEventListener('touchend', () => {
+    joystickData.active = false;
+    joystickData.x = 0;
+    joystickData.y = 0;
+    joystickStick.style.transform = 'translate(0, 0)';
+});
+
+// Auto Fire Mobile
+let isFiring = false;
+const fireBtn = document.getElementById('fire-btn');
+fireBtn.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    isFiring = true;
+});
+fireBtn.addEventListener('touchend', () => isFiring = false);
 
 window.addEventListener('mousedown', () => {
     if (gameState === STATE.PLAYING) player.shoot();
@@ -89,8 +206,10 @@ class Player extends Tank {
     constructor(x, y) {
         super(x, y, '#3b82f6');
         this.speedMultiplier = 1;
+        this.bulletSpeedMultiplier = 1; // Mới: Tốc độ đạn tăng vĩnh viễn
         this.isShielded = false;
         this.bulletType = 'NORMAL';
+        this.multiShotCount = 1; // Mới: Số lượng tia đạn tích lũy
         this.activeBuffs = {
             SPEED: null,
             SHIELD: null,
@@ -99,41 +218,49 @@ class Player extends Tank {
     }
 
     applyPowerUp(type) {
-        const duration = 10000; // 10s
+        const duration = 10000; // 10s cho các buff tạm thời
         
-        // Clear existing timeout if any
-        if (this.activeBuffs[type]) clearTimeout(this.activeBuffs[type]);
-
         switch(type) {
             case 'SPEED':
-                this.speedMultiplier = 2;
+                // Tốc độ đạn tăng vĩnh viễn
+                this.bulletSpeedMultiplier += 0.2;
                 break;
             case 'SHIELD':
                 this.isShielded = true;
+                if (this.activeBuffs['SHIELD']) clearTimeout(this.activeBuffs['SHIELD']);
+                this.activeBuffs['SHIELD'] = setTimeout(() => this.isShielded = false, duration);
                 break;
             case 'TRIPLE':
+                // Tích lũy đạn hoa cải vĩnh viễn
+                this.multiShotCount++;
                 this.bulletType = 'TRIPLE';
                 break;
+            case 'HEALTH':
+                this.health = Math.min(100, this.health + 20);
+                break;
         }
-
-        this.activeBuffs[type] = setTimeout(() => {
-            this.removePowerUp(type);
-        }, duration);
     }
 
     removePowerUp(type) {
-        switch(type) {
-            case 'SPEED':
-                this.speedMultiplier = 1;
-                break;
-            case 'SHIELD':
-                this.isShielded = false;
-                break;
-            case 'TRIPLE':
-                this.bulletType = 'NORMAL';
-                break;
+        // Chỉ dùng cho các hiệu ứng có thời hạn nếu cần
+    }
+
+    takeDamage(amount) {
+        if (this.isShielded) {
+            this.isShielded = false;
+            if (this.activeBuffs['SHIELD']) clearTimeout(this.activeBuffs['SHIELD']);
+            return;
         }
-        this.activeBuffs[type] = null;
+
+        // Nếu có đạn hoa cải thì trừ cấp độ đạn trước
+        if (this.multiShotCount > 1) {
+            this.multiShotCount--;
+            if (this.multiShotCount === 1) this.bulletType = 'NORMAL';
+            return;
+        }
+
+        this.health -= amount;
+        if (this.health <= 0) gameOver();
     }
 
     draw() {
@@ -153,34 +280,49 @@ class Player extends Tank {
     }
 
     update() {
-        // Di chuyển
+        // Di chuyển bằng phím
         const currentSpeed = this.speed * this.speedMultiplier;
         if (keys['KeyW'] || keys['ArrowUp']) this.y -= currentSpeed;
         if (keys['KeyS'] || keys['ArrowDown']) this.y += currentSpeed;
         if (keys['KeyA'] || keys['ArrowLeft']) this.x -= currentSpeed;
         if (keys['KeyD'] || keys['ArrowRight']) this.x += currentSpeed;
 
+        // Di chuyển bằng Joystick
+        if (joystickData.active) {
+            this.x += joystickData.x * currentSpeed;
+            this.y += joystickData.y * currentSpeed;
+            this.rotation = joystickData.angle;
+        } else {
+            // Xoay theo chuột nếu không dùng joystick
+            this.rotation = Math.atan2(mousePos.y - this.y, mousePos.x - this.x);
+        }
+
         // Giới hạn biên
         this.x = Math.max(this.radius, Math.min(canvas.width - this.radius, this.x));
         this.y = Math.max(this.radius, Math.min(canvas.height - this.radius, this.y));
 
-        // Xoay theo chuột
-        this.rotation = Math.atan2(mousePos.y - this.y, mousePos.x - this.x);
-
-        if (keys['Space']) this.shoot();
+        if (keys['Space'] || isFiring) this.shoot();
     }
 
     shoot() {
         const now = Date.now();
         if (now - this.lastShot > this.shotDelay) {
-            if (this.bulletType === 'TRIPLE') {
-                // Bắn 3 tia
-                const angles = [this.rotation - 0.2, this.rotation, this.rotation + 0.2];
-                angles.forEach(angle => {
-                    bullets.push(new Bullet(this.x, this.y, angle, true));
-                });
+            AudioFX.playShoot();
+            const bulletSpeed = 7 * this.bulletSpeedMultiplier;
+            if (this.bulletType === 'TRIPLE' || this.multiShotCount > 1) {
+                // Bắn nhiều tia dựa trên multiShotCount
+                const spread = 0.2;
+                const startAngle = this.rotation - (spread * (this.multiShotCount - 1)) / 2;
+                for (let i = 0; i < this.multiShotCount; i++) {
+                    const angle = startAngle + i * spread;
+                    const b = new Bullet(this.x, this.y, angle, true);
+                    b.speed = bulletSpeed;
+                    bullets.push(b);
+                }
             } else {
-                bullets.push(new Bullet(this.x, this.y, this.rotation, true));
+                const b = new Bullet(this.x, this.y, this.rotation, true);
+                b.speed = bulletSpeed;
+                bullets.push(b);
             }
             this.lastShot = now;
         }
@@ -188,10 +330,36 @@ class Player extends Tank {
 }
 
 class Enemy extends Tank {
-    constructor(x, y) {
-        super(x, y, '#ef4444');
-        this.speed = 1.5 + Math.random();
-        this.shotDelay = 1000 + Math.random() * 2000;
+    constructor(x, y, isBoss = false) {
+        super(x, y, isBoss ? '#f59e0b' : '#ef4444');
+        this.isBoss = isBoss;
+        this.radius = isBoss ? 60 : 25;
+        this.health = isBoss ? 500 + currentLevel * 200 : 100;
+        this.speed = isBoss ? 1 : 1.5 + Math.random() + (currentLevel * 0.1);
+        this.shotDelay = isBoss ? 800 : 1000 + Math.random() * 2000;
+        this.scoreValue = isBoss ? 500 : 10;
+    }
+
+    draw() {
+        super.draw();
+        if (this.isBoss) {
+            // Hiệu ứng hào quang cho Boss
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius + 15, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
+            ctx.lineWidth = 5;
+            ctx.setLineDash([10, 5]);
+            ctx.stroke();
+            ctx.restore();
+
+            // Thanh máu Boss cao cấp
+            const healthPercent = this.health / (500 + currentLevel * 200);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.fillRect(this.x - 50, this.y - 80, 100, 10);
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(this.x - 50, this.y - 80, 100 * healthPercent, 10);
+        }
     }
 
     update() {
@@ -232,13 +400,24 @@ class Bullet {
     }
 
     draw() {
+        ctx.save();
+        
+        // Bullet Trail (Vệt sáng)
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x - Math.cos(this.angle) * 20, this.y - Math.sin(this.angle) * 20);
+        ctx.strokeStyle = this.isPlayer ? 'rgba(96, 165, 250, 0.4)' : 'rgba(248, 113, 113, 0.4)';
+        ctx.lineWidth = this.radius * 2;
+        ctx.stroke();
+
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = this.isPlayer ? '#60a5fa' : '#f87171';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 15;
         ctx.shadowColor = this.isPlayer ? '#3b82f6' : '#ef4444';
         ctx.fill();
         ctx.shadowBlur = 0;
+        ctx.restore();
     }
 }
 
@@ -258,6 +437,7 @@ class PowerUp {
             case 'SPEED': return '#fcd34d'; // Vàng
             case 'SHIELD': return '#3b82f6'; // Xanh dương
             case 'TRIPLE': return '#10b981'; // Xanh lá
+            case 'HEALTH': return '#ef4444'; // Đỏ (Mới)
         }
     }
 
@@ -345,40 +525,67 @@ let particles = [];
 let powerUps = [];
 let floatingTexts = [];
 
+// Quản lý Level
+let levelEnemiesLeft = 10;
+let enemiesDefeated = 0;
+let bossSpawned = false;
+
 function initGame() {
-    player = new Player(canvas.width / 2, canvas.height / 2);
+    if (!player) {
+        player = new Player(canvas.width / 2, canvas.height / 2);
+    } else {
+        // Giữ nguyên buff khi qua màn
+        player.x = canvas.width / 2;
+        player.y = canvas.height / 2;
+    }
     enemies = [];
     bullets = [];
     particles = [];
     powerUps = [];
     floatingTexts = [];
-    score = 0;
-    shakeIntensity = 0;
+    isGameActive = true;
+    bossSpawned = false;
+    levelEnemiesLeft = 5 + currentLevel * 5;
     updateUI();
 }
 
-function spawnEnemy() {
-    if (gameState !== STATE.PLAYING) return;
+function spawnEnemy(isBoss = false) {
+    if (gameState !== STATE.PLAYING || (levelEnemiesLeft <= 0 && !isBoss)) return;
     
     let x, y;
     if (Math.random() < 0.5) {
-        x = Math.random() < 0.5 ? -50 : canvas.width + 50;
+        x = Math.random() < 0.5 ? -100 : canvas.width + 100;
         y = Math.random() * canvas.height;
     } else {
         x = Math.random() * canvas.width;
-        y = Math.random() < 0.5 ? -50 : canvas.height + 50;
+        y = Math.random() < 0.5 ? -100 : canvas.height + 100;
     }
     
-    enemies.push(new Enemy(x, y));
-    setTimeout(spawnEnemy, Math.max(1000, 3000 - score * 10));
+    // Enemy Spawn Indicator (UX sẽ làm đẹp hơn)
+    floatingTexts.push(new FloatingText(x > canvas.width ? canvas.width - 50 : (x < 0 ? 50 : x), 
+                                      y > canvas.height ? canvas.height - 50 : (y < 0 ? 50 : y), 
+                                      '⚠', '#ef4444'));
+
+    setTimeout(() => {
+        enemies.push(new Enemy(x, y, isBoss));
+        if (!isBoss) levelEnemiesLeft--;
+        if (levelEnemiesLeft > 0) setTimeout(spawnEnemy, 2000 - currentLevel * 100);
+    }, 1500);
 }
 
 function createExplosion(x, y, color) {
+    AudioFX.playExplosion();
     for (let i = 0; i < 20; i++) {
         particles.push(new Particle(x, y, color));
     }
     // Kích hoạt rung màn hình
-    shakeIntensity = 15;
+    shakeIntensity = 20;
+}
+
+function nextLevel() {
+    currentLevel++;
+    floatingTexts.push(new FloatingText(canvas.width/2, canvas.height/2, `LEVEL ${currentLevel}`, '#3b82f6'));
+    setTimeout(() => initGame(), 2000);
 }
 
 function updateUI() {
@@ -387,6 +594,7 @@ function updateUI() {
     document.getElementById('final-score').innerText = score;
     document.getElementById('high-score').innerText = highScore;
     document.getElementById('menu-high-score').innerText = highScore;
+    // Có thể thêm hiển thị Level lên HUD nếu muốn
 }
 
 function checkCollisions() {
@@ -400,21 +608,33 @@ function checkCollisions() {
                 const e = enemies[j];
                 const dist = Math.hypot(b.x - e.x, b.y - e.y);
                 if (dist < e.radius + b.radius) {
-                    createExplosion(e.x, e.y, '#ef4444');
-                    enemies.splice(j, 1);
+                    createExplosion(e.x, e.y, e.isBoss ? '#f59e0b' : '#ef4444');
+                    e.health -= 25; // Sát thương đạn
                     bullets.splice(i, 1);
-                    score += 10;
-                    
-                    // Thêm chữ bay điểm số
-                    floatingTexts.push(new FloatingText(e.x, e.y, '+10', '#fcd34d'));
-                    
-                    // Rơi vật phẩm ngẫu nhiên
-                    if (Math.random() < 0.2) {
-                        const types = ['SPEED', 'SHIELD', 'TRIPLE'];
-                        const type = types[Math.floor(Math.random() * types.length)];
-                        powerUps.push(new PowerUp(e.x, e.y, type));
+
+                    if (e.health <= 0) {
+                        enemies.splice(j, 1);
+                        score += e.scoreValue;
+                        floatingTexts.push(new FloatingText(e.x, e.y, `+${e.scoreValue}`, '#fcd34d'));
+                        
+                        if (e.isBoss) {
+                            nextLevel();
+                        } else {
+                            enemiesDefeated++;
+                            if (levelEnemiesLeft <= 0 && enemies.length === 0 && !bossSpawned) {
+                                bossSpawned = true;
+                                floatingTexts.push(new FloatingText(canvas.width/2, canvas.height/2, 'BOSS WARNING!', '#ef4444'));
+                                setTimeout(() => spawnEnemy(true), 3000);
+                            }
+                        }
+
+                        // Rơi vật phẩm ngẫu nhiên
+                        if (Math.random() < 0.3) {
+                            const types = ['SPEED', 'SHIELD', 'TRIPLE', 'HEALTH'];
+                            const type = types[Math.floor(Math.random() * types.length)];
+                            powerUps.push(new PowerUp(e.x, e.y, type));
+                        }
                     }
-                    
                     updateUI();
                     break;
                 }
@@ -425,16 +645,8 @@ function checkCollisions() {
             if (dist < player.radius + b.radius) {
                 createExplosion(player.x, player.y, '#3b82f6');
                 bullets.splice(i, 1);
-                
-                // Nếu có khiên thì không mất máu
-                if (player.isShielded) {
-                    player.removePowerUp('SHIELD'); // Mất khiên khi trúng đạn
-                } else {
-                    player.health -= 10;
-                }
-                
+                player.takeDamage(10);
                 updateUI();
-                if (player.health <= 0) gameOver();
             }
         }
 
@@ -450,8 +662,10 @@ function checkCollisions() {
         const dist = Math.hypot(p.x - player.x, p.y - player.y);
         
         if (dist < player.radius + p.radius) {
+            AudioFX.playPowerUp();
             player.applyPowerUp(p.type);
             powerUps.splice(i, 1);
+            floatingTexts.push(new FloatingText(player.x, player.y - 30, p.type, p.color));
         } else if (Date.now() - p.spawnTime > p.lifeTime) {
             powerUps.splice(i, 1);
         }
@@ -521,15 +735,22 @@ function gameLoop() {
 document.getElementById('start-btn').addEventListener('click', () => {
     document.getElementById('start-screen').classList.remove('active');
     gameState = STATE.PLAYING;
+    isGameActive = true;
     initGame();
     spawnEnemy();
 });
 
-document.getElementById('restart-btn').addEventListener('click', () => {
+// Sửa lỗi nút Restart trên Mobile (sử dụng pointerdown hoặc click rõ ràng)
+const restartBtn = document.getElementById('restart-btn');
+const handleRestart = (e) => {
+    e.preventDefault();
     document.getElementById('game-over-screen').classList.remove('active');
     gameState = STATE.PLAYING;
+    isGameActive = true;
     initGame();
-});
+};
+restartBtn.addEventListener('click', handleRestart);
+restartBtn.addEventListener('touchend', handleRestart);
 
 // Bắt đầu vòng lặp
 gameLoop();
