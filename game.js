@@ -82,6 +82,7 @@ const keys = {};
 window.addEventListener('keydown', e => keys[e.code] = true);
 window.addEventListener('keyup', e => keys[e.code] = false);
 
+let mousePos = { x: 0, y: 0 };
 window.addEventListener('mousemove', e => {
     mousePos.x = e.clientX;
     mousePos.y = e.clientY;
