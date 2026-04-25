@@ -183,16 +183,17 @@ p {
     animation: pulse 2s infinite;
 }
 
-/* Mobile Controls Styling */
+/* Mobile Controls Styling (Cyberpunk) */
 #mobile-controls {
     position: absolute;
-    bottom: 40px;
+    bottom: 50px;
     left: 0;
     width: 100%;
     display: none; /* Mặc định ẩn, sẽ hiện bằng JS nếu là cảm ứng */
     justify-content: space-between;
-    padding: 0 50px;
+    padding: 0 60px;
     pointer-events: none;
+    z-index: 1000;
 }
 
 #joystick-zone, #fire-zone {
@@ -200,46 +201,50 @@ p {
 }
 
 #joystick-base {
-    width: 120px;
-    height: 120px;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(5px);
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    width: 140px;
+    height: 140px;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
+    border: 2px solid rgba(59, 130, 246, 0.5);
     border-radius: 50%;
     position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2), inset 0 0 10px rgba(59, 130, 246, 0.2);
 }
 
 #joystick-stick {
-    width: 50px;
-    height: 50px;
-    background: var(--primary-color);
+    width: 60px;
+    height: 60px;
+    background: radial-gradient(circle, #60a5fa 0%, #3b82f6 100%);
     border-radius: 50%;
-    box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8), inset 0 0 15px rgba(255, 255, 255, 0.5);
     cursor: pointer;
+    border: 2px solid #93c5fd;
 }
 
 #fire-btn {
-    width: 80px;
-    height: 80px;
-    background: rgba(239, 68, 68, 0.3);
+    width: 100px;
+    height: 100px;
+    background: rgba(15, 23, 42, 0.6);
     backdrop-filter: blur(8px);
     border: 2px solid rgba(239, 68, 68, 0.5);
     border-radius: 50%;
-    font-size: 2rem;
+    font-size: 3rem;
     color: white;
     cursor: pointer;
     display: flex;
     justify-content: center;
     align-items: center;
-    transition: transform 0.1s;
+    transition: transform 0.1s, background 0.1s;
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.2), inset 0 0 10px rgba(239, 68, 68, 0.2);
 }
 
 #fire-btn:active {
     transform: scale(0.9);
     background: rgba(239, 68, 68, 0.6);
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.8);
 }
 
 /* Hiện trên thiết bị cảm ứng */
